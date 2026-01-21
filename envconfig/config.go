@@ -204,8 +204,24 @@ var (
 	ContextLength = Uint("OLLAMA_CONTEXT_LENGTH", 4096)
 	// Auth enables authentication between the Ollama client and server
 	UseAuth = Bool("OLLAMA_AUTH")
-	// Enable Vulkan backend
+	// Enable Vulkan backend (deprecated in NVIDIA-only fork)
 	EnableVulkan = Bool("OLLAMA_VULKAN")
+
+	// Low-VRAM Optimization Settings for NVIDIA GPUs
+	// VramBudget sets maximum VRAM to use in MB (0 = auto-detect minus overhead)
+	VramBudget = Uint64("OLLAMA_VRAM_BUDGET", 0)
+	// PrefetchLayers sets number of layers to prefetch ahead (default: 2)
+	PrefetchLayers = Uint("OLLAMA_PREFETCH_LAYERS", 2)
+	// MlockHotLayers locks frequently accessed layers (embeddings, output) in RAM
+	MlockHotLayers = BoolWithDefault("OLLAMA_MLOCK_HOT_LAYERS")
+	// KvCacheWindow sets sliding window size for KV cache in tokens (0 = disabled)
+	KvCacheWindow = Uint("OLLAMA_KV_CACHE_WINDOW", 4096)
+	// KvCacheQuant enables KV cache quantization (none, int8)
+	KvCacheQuant = String("OLLAMA_KV_CACHE_QUANT")
+	// UnifiedMemory enables CUDA unified memory for low-VRAM GPUs
+	UnifiedMemory = BoolWithDefault("OLLAMA_UNIFIED_MEMORY")
+	// PascalOptimize enables Pascal-specific optimizations (auto-detect by default)
+	PascalOptimize = BoolWithDefault("OLLAMA_PASCAL_OPTIMIZE")
 )
 
 func String(s string) func() string {
@@ -217,12 +233,8 @@ func String(s string) func() string {
 var (
 	LLMLibrary = String("OLLAMA_LLM_LIBRARY")
 
-	CudaVisibleDevices    = String("CUDA_VISIBLE_DEVICES")
-	HipVisibleDevices     = String("HIP_VISIBLE_DEVICES")
-	RocrVisibleDevices    = String("ROCR_VISIBLE_DEVICES")
-	VkVisibleDevices      = String("GGML_VK_VISIBLE_DEVICES")
-	GpuDeviceOrdinal      = String("GPU_DEVICE_ORDINAL")
-	HsaOverrideGfxVersion = String("HSA_OVERRIDE_GFX_VERSION")
+	CudaVisibleDevices = String("CUDA_VISIBLE_DEVICES")
+	GpuDeviceOrdinal   = String("GPU_DEVICE_ORDINAL")
 )
 
 func Uint(key string, defaultValue uint) func() uint {
@@ -294,6 +306,15 @@ func AsMap() map[string]EnvVar {
 		"OLLAMA_NEW_ENGINE":        {"OLLAMA_NEW_ENGINE", NewEngine(), "Enable the new Ollama engine"},
 		"OLLAMA_REMOTES":           {"OLLAMA_REMOTES", Remotes(), "Allowed hosts for remote models (default \"ollama.com\")"},
 
+		// Low-VRAM optimization settings
+		"OLLAMA_VRAM_BUDGET":       {"OLLAMA_VRAM_BUDGET", VramBudget(), "Max VRAM to use in MB (0=auto-detect minus overhead)"},
+		"OLLAMA_PREFETCH_LAYERS":   {"OLLAMA_PREFETCH_LAYERS", PrefetchLayers(), "Number of layers to prefetch ahead (default: 2)"},
+		"OLLAMA_MLOCK_HOT_LAYERS":  {"OLLAMA_MLOCK_HOT_LAYERS", MlockHotLayers(true), "Lock frequently used layers in RAM (default: true)"},
+		"OLLAMA_KV_CACHE_WINDOW":   {"OLLAMA_KV_CACHE_WINDOW", KvCacheWindow(), "Sliding window size for KV cache in tokens (default: 4096)"},
+		"OLLAMA_KV_CACHE_QUANT":    {"OLLAMA_KV_CACHE_QUANT", KvCacheQuant(), "KV cache quantization: none or int8 (default: none)"},
+		"OLLAMA_UNIFIED_MEMORY":    {"OLLAMA_UNIFIED_MEMORY", UnifiedMemory(true), "Use CUDA unified memory for low-VRAM GPUs (default: true for <6GB VRAM)"},
+		"OLLAMA_PASCAL_OPTIMIZE":   {"OLLAMA_PASCAL_OPTIMIZE", PascalOptimize(true), "Enable Pascal-specific optimizations (default: auto-detect)"},
+
 		// Informational
 		"HTTP_PROXY":  {"HTTP_PROXY", String("HTTP_PROXY")(), "HTTP proxy"},
 		"HTTPS_PROXY": {"HTTPS_PROXY", String("HTTPS_PROXY")(), "HTTPS proxy"},
@@ -307,15 +328,8 @@ func AsMap() map[string]EnvVar {
 		ret["no_proxy"] = EnvVar{"no_proxy", String("no_proxy")(), "No proxy"}
 	}
 
-	if runtime.GOOS != "darwin" {
-		ret["CUDA_VISIBLE_DEVICES"] = EnvVar{"CUDA_VISIBLE_DEVICES", CudaVisibleDevices(), "Set which NVIDIA devices are visible"}
-		ret["HIP_VISIBLE_DEVICES"] = EnvVar{"HIP_VISIBLE_DEVICES", HipVisibleDevices(), "Set which AMD devices are visible by numeric ID"}
-		ret["ROCR_VISIBLE_DEVICES"] = EnvVar{"ROCR_VISIBLE_DEVICES", RocrVisibleDevices(), "Set which AMD devices are visible by UUID or numeric ID"}
-		ret["GGML_VK_VISIBLE_DEVICES"] = EnvVar{"GGML_VK_VISIBLE_DEVICES", VkVisibleDevices(), "Set which Vulkan devices are visible by numeric ID"}
-		ret["GPU_DEVICE_ORDINAL"] = EnvVar{"GPU_DEVICE_ORDINAL", GpuDeviceOrdinal(), "Set which AMD devices are visible by numeric ID"}
-		ret["HSA_OVERRIDE_GFX_VERSION"] = EnvVar{"HSA_OVERRIDE_GFX_VERSION", HsaOverrideGfxVersion(), "Override the gfx used for all detected AMD GPUs"}
-		ret["OLLAMA_VULKAN"] = EnvVar{"OLLAMA_VULKAN", EnableVulkan(), "Enable experimental Vulkan support"}
-	}
+	ret["CUDA_VISIBLE_DEVICES"] = EnvVar{"CUDA_VISIBLE_DEVICES", CudaVisibleDevices(), "Set which NVIDIA devices are visible"}
+	ret["GPU_DEVICE_ORDINAL"] = EnvVar{"GPU_DEVICE_ORDINAL", GpuDeviceOrdinal(), "Set which NVIDIA devices are visible by numeric ID"}
 
 	return ret
 }
