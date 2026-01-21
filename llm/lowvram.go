@@ -1,6 +1,5 @@
 package llm
 
-// #include "lowvram.h"
 // #cgo CXXFLAGS: -std=c++17
 import "C"
 
